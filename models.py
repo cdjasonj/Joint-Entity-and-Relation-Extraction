@@ -5,7 +5,10 @@ from utils import seq_and_vec
 from keras.models import Model
 from keras import backend as K
 
-
+"""
+5/28 ，为LSTM,OUTPUTS,EMBEDDING都加上dropout
+完成attention_layer,Gate_Add_Layer
+"""
 class Attention_Layer(keras.layers.Layer):
     """
     dot attention for word_char_embedding
@@ -528,7 +531,7 @@ class self_attention_word_char_model():
         try the gate add way for word_char_embedding, char_embedding from the char-leve of word attention in the self-attention structure
 
         :param hidden_size:
-        :param word_embed_size: 
+        :param word_embed_size:
         :param char_embed_size:
         :param word_vocab_size:
         :param char_vocab_size:
