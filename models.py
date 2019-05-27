@@ -65,6 +65,7 @@ class base_model():
         part2_loss = K.mean(part2_loss)
 
         train_model.add_loss(part1_loss+part2_loss)
+        train_model.compile(keras.optimizers.adam(lr=5e-5))
         return entity_model,relation_model,train_model
 
 class word_char_model_1():
@@ -106,10 +107,22 @@ class word_char_model_3():
         :param dropout_prob:
         """
 
-class word_char_model_4():
+class self_attention_base_model():
     def __init__(self,hidden_size,embed_size,vocab_size,maxlen,num_classes_part1,num_classes_part2,dropout_prob=0.1):
         """
-        try the add way for word_char_embedding and self-attention for part1
+        try the add way for word_char_embedding and self-attention for part1 without word_char embedding
+        :param hidden_size:
+        :param embed_size:
+        :param vocab_size:
+        :param maxlen:
+        :param num_classes_part1:
+        :param num_classes_part2:
+        :param dropout_prob:
+        """
+class self_attention_word_char_model():
+    def __init__(self,hidden_size,embed_size,vocab_size,maxlen,num_classes_part1,num_classes_part2,dropout_prob=0.1):
+        """
+        try the add way for word_char_embedding and self-attention for part1 with gate word_char embedding
         :param hidden_size:
         :param embed_size:
         :param vocab_size:
