@@ -363,7 +363,6 @@ class word_char_model_3():
 
         return entity_model, relation_model, train_model
 
-
 class self_attention_base_model():
 
     def __init__(self,hidden_size,embed_size,vocab_size,multi_layers,maxlen,maxlen_word,num_classes_part1,

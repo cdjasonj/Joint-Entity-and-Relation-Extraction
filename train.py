@@ -1,0 +1,1 @@
+from models import self_attention_model_ner_part

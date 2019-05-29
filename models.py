@@ -37,10 +37,10 @@ class word_char_lstm_model():
         part2 : outputs_concat LSTM => dense=>outputs
         :return:
         """
-        word_input = Input(shape=(self.maxlen,))  # [batch_size,sentence]
-        char_input = Input(shape=(self.maxlen, self.maxlen_word,))  # [batch_size,sentence,word]
-        outputs_part1 = Input(shape=(self.maxlen,))
-        outputs_part2 = Input(shape=(self.maxlen,))
+        word_input = Input(shape=(None,))  # [batch_size,sentence]
+        char_input = Input(shape=(None,None,))  # [batch_size,sentence,word]
+        outputs_part1 = Input(shape=(None,))
+        outputs_part2 = Input(shape=(None,None,))  #[batch,sentence,sentence*rel_counts]
         # word_embedding_layer
         word_embedding = Embedding(self.word_vocab_size, self.word_embed_size, name='word_embedding')(word_input)
         char_embedding = Embedding(self.char_vocab_size, self.char_embed_size, name='char_embedding')(char_input)  # [batch,sentence,word,dim of char embedding]
@@ -87,12 +87,12 @@ class word_char_lstm_model():
         ###############################################################################################################################
         # part2 multi-head selection for relation classfication
         h = Concatenate(axis=-1)([lstm, entity_pred])
-        multi_head_selection_pred = Dense(self.num_classes_part2, activation='softmax')(h)
+        multi_head_selection_pred = Dense(self.num_classes_part2, activation='sigmoid')(h) #[batch_size,sentence,]
         relation_model = Model([word_input], [multi_head_selection_pred])
         train_model = Model([word_input, outputs_part1, outputs_part2], [multi_head_selection_pred])
 
         part1_loss = K.sparse_categorical_crossentropy(outputs_part1, entity_pred)
-        part2_loss = K.sparse_categorical_crossentropy(outputs_part2, multi_head_selection_pred)
+        part2_loss = K.binary_crossentropy(outputs_part2, multi_head_selection_pred)
         part1_loss = K.mean(part1_loss)
         part2_loss = K.mean(part2_loss)
 
@@ -202,3 +202,16 @@ class word_char_self_attention_model():
         train_model.compile(keras.optimizers.adam(lr=5e-5))
 
         return entity_model, relation_model, train_model
+
+
+class self_attention_model_ner_part():
+    def __init__(self,hidden_size,is_use_char_embedding=True):
+        """
+        测试一下self-attention在ner上的效果
+        """
+
+class lstm_attention_model_ner_part():
+    def __init__(self,hidden_size,is_use_char_embedding=True):
+        """
+        测试一下lstm结构在ner上的效果
+        """

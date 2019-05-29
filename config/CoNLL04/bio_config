@@ -1,0 +1,23 @@
+#dataset
+filename_dev = "data/CoNLL04/dev.txt"
+filename_test = "data/CoNLL04/test.txt"
+filename_train = "data/CoNLL04/train.txt"
+
+filename_train_me = 'data/CoNLL04/train_me.json'
+filename_dev_me = 'data/CoNLL04/dev_me.json'
+filename_test_me = 'data/CoNLL04/test_me.json'
+
+#training
+epochs = 150
+batch_size = 128
+optimizer = Adam
+
+#hyperparameters
+hidden_size = 128
+nb_head = 8
+word_embed_size = 200
+char_embed_size = 200
+multi_layers = 4
+embedding_dropout_prob = 0.1
+nn_dropout_prob = 0.1
+learning_rate = 2e-4

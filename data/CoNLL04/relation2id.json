@@ -1,0 +1,24 @@
+[
+    {
+        "1": "O",
+        "2": "B-Loc",
+        "3": "I-Loc",
+        "4": "B-Peop",
+        "5": "I-Peop",
+        "6": "B-Org",
+        "7": "I-Org",
+        "8": "B-Other",
+        "9": "I-Other"
+    },
+    {
+        "O": 1,
+        "B-Loc": 2,
+        "I-Loc": 3,
+        "B-Peop": 4,
+        "I-Peop": 5,
+        "B-Org": 6,
+        "I-Org": 7,
+        "B-Other": 8,
+        "I-Other": 9
+    }
+]

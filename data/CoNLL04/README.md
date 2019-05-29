@@ -5,3 +5,5 @@ See our multi-head selection papers for more info.
 The format of the input files has been adapted to the input format of our head selection model. 
 
 The original link to the dataset can be found [here](http://cogcomp.org/Data/ER/conll04.corp).
+
+data from here https://github.com/bekou/multihead_joint_entity_relation_extraction/tree/master/data/CoNLL04
