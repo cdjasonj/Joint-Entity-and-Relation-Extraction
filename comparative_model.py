@@ -562,10 +562,11 @@ class lstm_model_ner_part():
                     lstm = Dropout(self.nn_dropout_prob)(lstm)
 
         bio_pred = Dense(self.num_classes, activation='softmax')(lstm)
-        ner_model = Model([word_input, char_input, ner_label], bio_pred)
+        pred_model =Model([word_input, char_input], bio_pred)
+        train_model = Model([word_input, char_input, ner_label], bio_pred)
         loss = K.sparse_categorical_crossentropy(ner_label, bio_pred)
         loss = K.mean(loss)
-        ner_model.add_loss(loss)
-        ner_model.compile(keras.optimizers.adam(lr=self.learning_rate))
+        train_model.add_loss(loss)
+        train_model.compile(keras.optimizers.adam(lr=self.learning_rate))
 
-        return ner_model
+        return train_model,pred_model

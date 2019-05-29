@@ -119,6 +119,14 @@ def char_pad(datas):
 
     return datas
 
+def load_data(mode):
+    #load data for predict
+    config_file = read_properties('config/CoNLL04/bio_config')
+    if mode == 'dev':
+        filename_dev_me = config_file.getProperty("filename_dev_me")
+        dev_data = json.load(open(filename_dev_me, encoding='utf-8'))
+
+
 class data_generator():
     def __init__(self,data,char2id,word2id,BIO2id,batch_size=128):
         self.data = data
@@ -129,10 +137,8 @@ class data_generator():
         self.steps = len(self.data)//self.batch_size
         if len(self.data) % self.batch_size != 0:
             self.steps += 1
-
     def __len__(self):
         return self.steps
-
     def __iter__(self):
         while True :
             index = list(range(len(self.data)))
