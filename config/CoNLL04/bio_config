@@ -3,21 +3,28 @@ filename_dev = "data/CoNLL04/dev.txt"
 filename_test = "data/CoNLL04/test.txt"
 filename_train = "data/CoNLL04/train.txt"
 
-filename_train_me = 'data/CoNLL04/train_me.json'
-filename_dev_me = 'data/CoNLL04/dev_me.json'
-filename_test_me = 'data/CoNLL04/test_me.json'
+filename_train_me = "data/CoNLL04/train_me.json"
+filename_dev_me = "data/CoNLL04/dev_me.json"
+filename_test_me = "data/CoNLL04/test_me.json"
+
+filename_char2id = "data/CoNLL04/char2id.json"
+filename_word2id = "data/CoNLL04/word2id.json"
+filename_BIO2id = "data/CoNLL04/BIO2id.json"
+filename_relation2id = "data/CoNLL04/relation2id.json"
 
 #training
 epochs = 150
 batch_size = 128
 optimizer = Adam
+save_model_file = "save_model/ner_model.weights"
 
 #hyperparameters
 hidden_size = 128
 nb_head = 8
-word_embed_size = 200
-char_embed_size = 200
+word_embed_size = 300
+char_embed_size = 300
 multi_layers = 4
 embedding_dropout_prob = 0.1
 nn_dropout_prob = 0.1
 learning_rate = 2e-4
+is_use_char_embedding = True

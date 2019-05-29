@@ -72,6 +72,7 @@ class word_char_lstm_model():
                     CuDNNLSTM(self.hidden_size // 2, return_sequences=True, name='lstm_layer{}'.format(i + 1)))(lstm)
                 if self.nn_dropout_prob:
                     lstm = Dropout(self.nn_dropout_prob)(lstm)
+
         attention = TimeDistributed(Dense(1, activation='tanh'))(lstm)
         attention = Flatten()(attention)
         attention = Activation('softmax')(attention)
@@ -204,14 +205,3 @@ class word_char_self_attention_model():
         return entity_model, relation_model, train_model
 
 
-class self_attention_model_ner_part():
-    def __init__(self,hidden_size,is_use_char_embedding=True):
-        """
-        测试一下self-attention在ner上的效果
-        """
-
-class lstm_attention_model_ner_part():
-    def __init__(self,hidden_size,is_use_char_embedding=True):
-        """
-        测试一下lstm结构在ner上的效果
-        """

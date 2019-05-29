@@ -6,9 +6,9 @@ import codecs
 
 def readFile(file_name):
     head_id_col_vector = ['token_id', 'token', "BIO", "relation", 'head']
-    headfile = pd.read_csv(file_name, names=head_id_col_vector, encoding="utf-8",
+    file = pd.read_csv(file_name, names=head_id_col_vector, encoding="utf-8",
                            engine='python', sep="\t", quoting=csv.QUOTE_NONE).as_matrix()
-    return headfile
+    return file
 
 def collect_data_set(file,save_file):
     datas = []
@@ -37,6 +37,7 @@ def collect_data_set(file,save_file):
 
     with codecs.open(save_file, 'w', encoding='utf-8') as f:
         json.dump(datas, f, indent=4, ensure_ascii=False)
+    return datas
 
 def collect_char2id(datasets,save_file):
     chars = {}
@@ -97,3 +98,63 @@ class read_properties:
     def getProperty(self,propertyName):
         return self.props.get(propertyName)
 
+def sentence_pad(datas):
+    #sentence_level pad for word input and bio tagging
+    #use the maxlen of batch datas to pad the sentence level inputs
+    """
+
+    :param datas: [batch_size,None]
+    :return: datas : [batch_size,maxlen of sentence]
+    """
+
+    return datas
+def char_pad(datas):
+    #word_leve pad for char input
+    #use the maxlen of batch data of words to pad the char levels and use the maxlen of batch datas to pad the sentence level inputs
+    """
+
+    :param datas: [batch_size,None,None]
+    :return: [batch_size,maxlen of sentence , maxlen of words]
+    """
+
+    return datas
+
+class data_generator():
+    def __init__(self,data,char2id,word2id,BIO2id,batch_size=128):
+        self.data = data
+        self.batch_size = batch_size
+        self.char2id = char2id
+        self.word2id = word2id
+        self.BIO2id = BIO2id
+        self.steps = len(self.data)//self.batch_size
+        if len(self.data) % self.batch_size != 0:
+            self.steps += 1
+
+    def __len__(self):
+        return self.steps
+
+    def __iter__(self):
+        while True :
+            index = list(range(len(self.data)))
+            np.random.shuffle(index)
+            TEXT_WORD,TEXT_CHAR,BIO = [],[],[]
+            for idx in index:
+                _data = self.data[idx]
+                text = _data['text']
+                bio = _data['BIOS']
+                _text_word = [self.word2id.get(word) for word in text]
+                _text_char = [] # 2 dimmensions
+                for word in _text_word:
+                    chars = [self.char2id.get(_char) for _char in word]
+                    _text_char.append(chars)
+                _bio = [self.BIO2id.get(b) for b in bio]
+                TEXT_WORD.append(_text_word)
+                TEXT_CHAR.append(_text_char) #[batch,word,char] #padding two times,
+                # first in word dimensions for sentence maxlen ,then ,in char dimensions for maxlen_word
+                BIO.append(_bio)
+                if len(TEXT_WORD) == self.batch_size or idx == index[-1]:
+                    TEXT_WORD = np.array(sentence_pad(TEXT_WORD))
+                    TEXT_CHAR = np.array(char_pad(TEXT_CHAR))
+                    BIO = np.array(sentence_pad(BIO))
+                    yield [TEXT_WORD,TEXT_CHAR,BIO ],None
+                    TEXT_WORD,TEXT_CHAR,BIO =[],[],[]
