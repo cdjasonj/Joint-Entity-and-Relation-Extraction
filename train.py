@@ -35,8 +35,8 @@ learning_rate = config_file.getProperty('learning_rate')
 
 train_data = json.load(open(filename_train_me,encoding='utf-8'))
 dev_data = json.load(open(filename_dev_me,encoding='utf-8'))
-id2char, char2id = json.load(open(char_embed_size,encoding='utf-8'))
-id2word, word2id = json.load(open(word_embed_size,encoding='utf-8'))
+id2char, char2id = json.load(open(filename_char2id,encoding='utf-8'))
+id2word, word2id = json.load(open(filename_word2id,encoding='utf-8'))
 id2BIO,BIO2id = json.load(open(filename_BIO2id,encoding='utf-8'))
 # id2relation,relation2id = json.load(open(filename_relation2id,encoding='utf-8'))
 char_vocab_size = len(char2id) +1  # 0,padding
@@ -50,9 +50,13 @@ self_att_model = self_attention_model_ner_part(hidden_size, nb_head, word_embed_
                                                ner_classes_num, learning_rate, embedding_dropout_prob, nn_dropout_prob, is_use_char_embedding)
 train_model, pred_model = lstm_model.model()
 
+#TODO  only ner part now, then complete it
+
 def pred_op(mode):
-    load_data(mode)
-    ner_pred = pred_model.predict()
+    eval_TEXT_WORD, eval_TEXT_CHAR, true_bio = load_data(mode)
+    ner_pred = pred_model.predict([eval_TEXT_WORD, eval_TEXT_CHAR],batch_size=800,verbose=1)#[batch,sentence,num_classe]
+    ner_pred = np.argmax(ner_pred,axis=-1) #[batch,sentence]
+    return ner_pred,true_bio
 
 def train_op():
     train_D = data_generator(train_data,char2id,word2id,BIO2id,batch_size)
@@ -63,9 +67,9 @@ def train_op():
                                   epochs=1,
                                   )
         if (i) % 2 == 0 : #两次对dev进行一次测评,并对dev结果进行保存
-            print('进入到这里了哟~')
-            ner_pred = pred_op('dev')
-            P, R, F = NER_result_Evaluator()
+            # print('进入到这里了哟~')
+            ner_pred,true_bio = pred_op('dev')
+            P, R, F = NER_result_Evaluator(ner_pred,true_bio)
             if F > best_f1 :
                 train_model.save_weights(model_save_file)
                 print('当前第{}个epoch，准确度为{},召回为{},f1为：{}'.format(i,P,R,F))

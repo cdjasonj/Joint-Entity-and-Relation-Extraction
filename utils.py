@@ -60,25 +60,30 @@ def collect_word2id(datasets,save_file):
     with codecs.open(save_file, 'w', encoding='utf-8') as f:
         json.dump([id2word, word2id], f, indent=4, ensure_ascii=False)
 
+
 def collect_BIO2id(datasets,save_file):
     BIOs = {}
     for data in datasets:
         for bio in data['BIOS']:
-             BIOs[bio] = BIOs.get(bio,0) +1
+            if bio != 'O':
+                BIOs[bio] = BIOs.get(bio,0) +1
+
     id2BIO = {i+1:j for i,j in enumerate(BIOs)} #padding:0
+    id2BIO[0] = 'O'
     BIO2id = {j:i for i,j in id2BIO.items()}
     with codecs.open(save_file, 'w', encoding='utf-8') as f:
         json.dump([id2BIO, BIO2id], f, indent=4, ensure_ascii=False)
 
-def collect_relations2id(datasets,save_file):
-    BIOs = {}
-    for data in datasets:
-        for bio in data['BIOS']:
-             BIOs[bio] = BIOs.get(bio,0) +1
-    id2BIO = {i+1:j for i,j in enumerate(BIOs)} #padding:0
-    BIO2id = {j:i for i,j in id2BIO.items()}
-    with codecs.open(save_file, 'w', encoding='utf-8') as f:
-        json.dump([id2BIO, BIO2id], f, indent=4, ensure_ascii=False)
+
+# def collect_relations2id(datasets,save_file):
+#     BIOs = {}
+#     for data in datasets:
+#         for bio in data['BIOS']:
+#              BIOs[bio] = BIOs.get(bio,0) +1
+#     id2BIO = {i+1:j for i,j in enumerate(BIOs)} #padding:0
+#     BIO2id = {j:i for i,j in id2BIO.items()}
+#     with codecs.open(save_file, 'w', encoding='utf-8') as f:
+#         json.dump([id2BIO, BIO2id], f, indent=4, ensure_ascii=False)
 
 
 class read_properties:
@@ -119,14 +124,48 @@ def char_pad(datas):
 
     return datas
 
+#TODO complete the function for joint extraction
 def load_data(mode):
+    #only for ner prediction now , then i will compelet the function for joint extraction
     #load data for predict
     config_file = read_properties('config/CoNLL04/bio_config')
+    filename_char2id = config_file.getProperty("filename_char2id")
+    filename_word2id = config_file.getProperty("filename_word2id")
+    filename_BIO2id = config_file.getProperty("filename_BIO2id")
+    filename_relation2id = config_file.getProperty("filename_relation2id")
+    id2char, char2id = json.load(open(filename_char2id, encoding='utf-8'))
+    id2word, word2id = json.load(open(filename_word2id, encoding='utf-8'))
+    id2BIO, BIO2id = json.load(open(filename_BIO2id, encoding='utf-8'))
+    filename_dev_me = config_file.getProperty("filename_dev_me")
+    filename_test_me = config_file.getProperty("filename_test_me")
+    eval_data=  []
+
     if mode == 'dev':
-        filename_dev_me = config_file.getProperty("filename_dev_me")
-        dev_data = json.load(open(filename_dev_me, encoding='utf-8'))
+        eval_data = json.load(open(filename_dev_me, encoding='utf-8'))
+    if mode == 'test':
+        eval_data = json.load(open(filename_test_me, encoding='utf-8'))
 
+    for data in eval_data:
+        TEXT_WORD, TEXT_CHAR, BIO = [], [], []
+        text = data['text']
+        bio = data['BIOS']
+        _text_word = [word2id.get(word) for word in text]
+        _text_char = []  # 2 dimmensions
+        for word in _text_word:
+            chars = [char2id.get(_char) for _char in word]
+            _text_char.append(chars)
+        _bio = [BIO2id.get(b) for b in bio]
+        TEXT_WORD.append(_text_word)
+        TEXT_CHAR.append(_text_char)  # [batch,word,char] #padding two times,
+        # first in word dimensions for sentence maxlen ,then ,in char dimensions for maxlen_word
+        BIO.append(_bio)
+        TEXT_WORD = np.array(sentence_pad(TEXT_WORD))
+        TEXT_CHAR = np.array(char_pad(TEXT_CHAR))
+        BIO = np.array(sentence_pad(BIO))
 
+        return TEXT_WORD,TEXT_CHAR,BIO
+
+#TODO
 class data_generator():
     def __init__(self,data,char2id,word2id,BIO2id,batch_size=128):
         self.data = data
