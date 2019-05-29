@@ -1,8 +1,7 @@
-from layers import Position_Embedding,Attention_Layer,Self_Attention_Layer
-from utils import seq_and_vec
+from layers import Position_Embedding,Attention_Layer,Self_Attention_Layer,Gate_Add_Lyaer,seq_and_vec
 from keras.models import Model
-from layers import *
-
+from keras.layers import *
+import keras
 class base_model():
     def __init__(self,hidden_size,embed_size,vocab_size,multi_layers,maxlen,num_classes_part1,num_classes_part2,
                  learning_rate = 5e-5,embedding_dropout_prob=0.1,nn_dropout_prob=0.1,optmizer='adam'):

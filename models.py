@@ -1,9 +1,8 @@
 import keras
 import numpy as np
 from keras.layers import *
-from utils import seq_and_vec
 from keras.models import Model
-from layers import Position_Embedding,Attention_Layer,Self_Attention_Layer,Gate_Add_Lyaer
+from layers import Position_Embedding,Attention_Layer,Self_Attention_Layer,Gate_Add_Lyaer,seq_and_vec
 
 class word_char_lstm_model():
 
