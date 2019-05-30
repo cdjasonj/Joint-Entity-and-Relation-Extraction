@@ -206,3 +206,44 @@ class MaskedLSTM(keras.layers.CuDNNLSTM):
             mask = K.cast(mask, K.floatx())
             inputs *= K.expand_dims(mask, axis=-1)
         return super(MaskedLSTM, self).call(inputs)
+
+
+class MaskFlatten(keras.layers.Flatten):
+
+    def __init__(self, **kwargs):
+        super(MaskFlatten, self).__init__(**kwargs)
+        self.supports_masking = True
+
+    def compute_mask(self, inputs, mask=None):
+        return mask
+
+    def call(self, inputs, mask=None):
+        # if mask is not None:
+            # mask = K.cast(mask, K.floatx())
+            # inputs *= K.expand_dims(mask, axis=-1)
+        return super(MaskFlatten, self).call(inputs) #调用父类的call ,然后传入inputs
+
+
+class MaskRepeatVector(keras.layers.RepeatVector):
+
+    def __init__(self, n,**kwargs):
+        super(MaskRepeatVector, self).__init__(n,**kwargs)
+        self.supports_masking = True
+
+    def compute_mask(self, inputs, mask=None):
+        return mask
+
+    def call(self, inputs, mask=None):
+        return super(MaskRepeatVector, self).call(inputs)
+
+class MaskPermute(keras.layers.Permute):
+
+    def __init__(self, dims,**kwargs):
+        super(MaskPermute, self).__init__(dims,**kwargs)
+        self.supports_masking = True
+
+    def compute_mask(self, inputs, mask=None):
+        return mask
+
+    def call(self, inputs, mask=None):
+        return super(MaskPermute, self).call(inputs)

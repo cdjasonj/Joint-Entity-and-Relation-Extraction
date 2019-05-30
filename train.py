@@ -49,15 +49,15 @@ ner_classes_num = len(BIO2id)
 sequence_length = 100
 word_length = 30
 epochs = 300
-word_embedding_size = 100
-char_embedding_size = 100
+word_embedding_size = 300
+char_embedding_size = 300
 hidden_size = 128
 # lstm_model = lstm_model_ner_part(hidden_size, nb_head, word_embed_size, char_embed_size, word_vocab_size, char_vocab_size, multi_layers,
 #                                  ner_classes_num, learning_rate, embedding_dropout_prob, nn_dropout_prob, is_use_char_embedding)
 #
 # self_att_model = self_attention_model_ner_part(hidden_size, nb_head, word_embed_size, char_embed_size, word_vocab_size, char_vocab_size, multi_layers,
 #                                                ner_classes_num, learning_rate, embedding_dropout_prob, nn_dropout_prob, is_use_char_embedding)
-# self_att_model = self_attention_model_ner_part(hidden_size, 8, word_embedding_size, char_embedding_size, word_vocab_size, char_vocab_size, 3,
+# self_att_model = self_attention_model_ner_part(hidden_size, 8, word_embedding_size, char_embedding_size, word_vocab_size, char_vocab_size, 8,
 #                                                ner_classes_num, sequence_length,word_length,1e-3, 0.15, 0.15, 'adam',False)
 #
 lstm_model = lstm_model_ner_part(hidden_size, 8, word_embedding_size, char_embedding_size, word_vocab_size, char_vocab_size, 3,
@@ -72,6 +72,7 @@ def pred_op(mode):
     ner_pred = np.argmax(ner_pred,axis=-1) #[batch,sentence]
     return ner_pred,true_bio
 
+train_data +=dev_data
 def train_op():
     train_D = data_generator(train_data,char2id,word2id,BIO2id,sequence_length,word_length,128)
     best_f1 = 0
@@ -82,10 +83,14 @@ def train_op():
                                   )
         if (i) % 2 == 0 : #两次对dev进行一次测评,并对dev结果进行保存
             # print('进入到这里了哟~')
-            ner_pred,true_bio = pred_op('dev')
+            ner_pred,true_bio = pred_op('test')
             P, R, F = NER_result_Evaluator(ner_pred,true_bio)
             if F > best_f1 :
                 train_model.save_weights(model_save_file)
+                best_f1 = F
                 print('当前第{}个epoch，准确度为{},召回为{},f1为：{}'.format(i,P,R,F))
+
     ner_pred, true_bio = pred_op('test')
+    P, R, F = NER_result_Evaluator(ner_pred, true_bio)
+    print('训练集,准确度为{},召回为{},f1为：{}'.format( P, R, F))
 train_op()
