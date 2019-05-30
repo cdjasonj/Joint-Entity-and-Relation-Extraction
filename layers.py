@@ -21,7 +21,15 @@ class Attention_Layer(keras.layers.Layer):
     score = softmax(dot(q,v))
     attention = sum(score*k)=
     """
-    # def __init__(self):
+    # def __init__(self,**kwargs):
+    #     super(Attention_Layer,self).__init__(**kwargs)
+    #
+    # def build(self, input_shape):
+    #     self.W = self.add_weight(name='W',shape=(input_shape[-1],input_shape[-1]),initializer='glorot_normal')
+    #     self.acitvation =
+    # def call(self,inputs,mask=None):
+    #     score = K.softmax(K.dot(inputs,self.W),axis=-1)
+    #     c =
 
 
 class Gate_Add_Lyaer(keras.layers.Layer):
@@ -95,76 +103,106 @@ class Position_Embedding(Layer):
 
 
 class Self_Attention_Layer(Layer):
+    """多头注意力机制
+       """
 
-    def __init__(self, nb_head, size_per_head, mask_right=False, **kwargs):
+    def __init__(self, nb_head, size_per_head, **kwargs):
         self.nb_head = nb_head
         self.size_per_head = size_per_head
-        self.output_dim = nb_head * size_per_head
-        self.mask_right = mask_right
+        self.out_dim = nb_head * size_per_head
         super(Self_Attention_Layer, self).__init__(**kwargs)
 
     def build(self, input_shape):
-        self.WQ = self.add_weight(name='WQ',
-                                  shape=(input_shape[0][-1], self.output_dim),
-                                  initializer='glorot_uniform',
-                                  trainable=True)
-        self.WK = self.add_weight(name='WK',
-                                  shape=(input_shape[1][-1], self.output_dim),
-                                  initializer='glorot_uniform',
-                                  trainable=True)
-        self.WV = self.add_weight(name='WV',
-                                  shape=(input_shape[2][-1], self.output_dim),
-                                  initializer='glorot_uniform',
-                                  trainable=True)
-        super(Self_Attention_Layer, self).build(input_shape)
+        q_in_dim = input_shape[0][-1]
+        k_in_dim = input_shape[1][-1]
+        v_in_dim = input_shape[2][-1]
+        self.q_kernel = self.add_weight(name='q_kernel',
+                                        shape=(q_in_dim, self.out_dim),
+                                        initializer='glorot_normal')
+        self.k_kernel = self.add_weight(name='k_kernel',
+                                        shape=(k_in_dim, self.out_dim),
+                                        initializer='glorot_normal')
+        self.v_kernel = self.add_weight(name='w_kernel',
+                                        shape=(v_in_dim, self.out_dim),
+                                        initializer='glorot_normal')
 
-    def Mask(self, inputs, seq_len, mode='mul'):
-        if seq_len == None:
-            return inputs
+    def mask(self, x, mask, mode='mul'):
+        if mask is None:
+            return x
         else:
-            mask = K.one_hot(seq_len[:, 0], K.shape(inputs)[1])
-            mask = 1 - K.cumsum(mask, 1)
-            for _ in range(len(inputs.shape) - 2):
-                mask = K.expand_dims(mask, 2)
+            for _ in range(K.ndim(x) - K.ndim(mask)):
+                mask = K.expand_dims(mask, K.ndim(mask))
             if mode == 'mul':
-                return inputs * mask
-            if mode == 'add':
-                return inputs - (1 - mask) * 1e12
+                return x * mask
+            else:
+                return x - (1 - mask) * 1e10
 
-    def call(self, x,mask=None):
-        # 如果只传入Q_seq,K_seq,V_seq，那么就不做Mask
-        # 如果同时传入Q_seq,K_seq,V_seq,Q_len,V_len，那么对多余部分做Mask
-        if len(x) == 3:
-            Q_seq, K_seq, V_seq = x
-            Q_len, V_len = None, None
-        elif len(x) == 5:
-            Q_seq, K_seq, V_seq, Q_len, V_len = x
-        # 对Q、K、V做线性变换
-        Q_seq = K.dot(Q_seq, self.WQ)
-        Q_seq = K.reshape(Q_seq, (-1, K.shape(Q_seq)[1], self.nb_head, self.size_per_head))
-        Q_seq = K.permute_dimensions(Q_seq, (0, 2, 1, 3))
-        K_seq = K.dot(K_seq, self.WK)
-        K_seq = K.reshape(K_seq, (-1, K.shape(K_seq)[1], self.nb_head, self.size_per_head))
-        K_seq = K.permute_dimensions(K_seq, (0, 2, 1, 3))
-        V_seq = K.dot(V_seq, self.WV)
-        V_seq = K.reshape(V_seq, (-1, K.shape(V_seq)[1], self.nb_head, self.size_per_head))
-        V_seq = K.permute_dimensions(V_seq, (0, 2, 1, 3))
-        # 计算内积，然后mask，然后softmax
-        A = K.batch_dot(Q_seq, K_seq, axes=[3, 3]) / self.size_per_head ** 0.5
-        A = K.permute_dimensions(A, (0, 3, 2, 1))
-        A = self.Mask(A, V_len, 'add')
-        A = K.permute_dimensions(A, (0, 3, 2, 1))
-        if self.mask_right:
-            ones = K.ones_like(A[:1, :1])
-            mask = (ones - K.tf.matrix_band_part(ones, -1, 0)) * 1e12
-            A = A - mask
-        A = K.softmax(A)
-        # 输出并mask
-        O_seq = K.batch_dot(A, V_seq, axes=[3, 2])
-        O_seq = K.permute_dimensions(O_seq, (0, 2, 1, 3))
-        O_seq = K.reshape(O_seq, (-1, K.shape(O_seq)[1], self.output_dim))
-        O_seq = self.Mask(O_seq, Q_len, 'mul')
-        return O_seq
+    def call(self, inputs):
+        q, k, v = inputs[:3]
+        v_mask, q_mask = None, None
+        if len(inputs) > 3:
+            v_mask = inputs[3]
+            if len(inputs) > 4:
+                q_mask = inputs[4]
+        # 线性变化
+        qw = K.dot(q, self.q_kernel)
+        kw = K.dot(k, self.k_kernel)
+        vw = K.dot(v, self.v_kernel)
+        # qw = Dense(self.out_dim,activation='relu')(q)
+        # kw = Dense(self.out_dim, activation='relu')(k)
+        # vw = Dense(self.out_dim, activation='relu')(v)
+        # 形状变换
+        qw = K.reshape(qw, (-1, K.shape(qw)[1], self.nb_head, self.size_per_head))
+        kw = K.reshape(kw, (-1, K.shape(kw)[1], self.nb_head, self.size_per_head))
+        vw = K.reshape(vw, (-1, K.shape(vw)[1], self.nb_head, self.size_per_head))
+        # 维度置换
+        qw = K.permute_dimensions(qw, (0, 2, 1, 3))
+        kw = K.permute_dimensions(kw, (0, 2, 1, 3))
+        vw = K.permute_dimensions(vw, (0, 2, 1, 3))
+        # Attention
+        a = K.batch_dot(qw, kw, [3, 3]) / self.size_per_head ** 0.5
+        a = K.permute_dimensions(a, (0, 3, 2, 1))
+        a = self.mask(a, v_mask, 'add')
+        a = K.permute_dimensions(a, (0, 3, 2, 1))
+        a = K.softmax(a)
+        # 完成输出
+        o = K.batch_dot(a, vw, [3, 2])
+        o = K.permute_dimensions(o, (0, 2, 1, 3))
+        o = K.reshape(o, (-1, K.shape(o)[1], self.out_dim))
+        o = self.mask(o, q_mask, 'mul')
+        return o
 
     def compute_output_shape(self, input_shape):
-        return (input_shape[0][0], input_shape[0][1], self.output_dim)
+        return (input_shape[0][0], input_shape[0][1], self.out_dim)
+
+
+class MaskedConv1D(keras.layers.Conv1D):
+
+    def __init__(self, **kwargs):
+        super(MaskedConv1D, self).__init__(**kwargs)
+        self.supports_masking = True
+
+    def compute_mask(self, inputs, mask=None):
+        return mask
+
+    def call(self, inputs, mask=None):
+        if mask is not None:
+            mask = K.cast(mask, K.floatx())
+            inputs *= K.expand_dims(mask, axis=-1)
+        return super(MaskedConv1D, self).call(inputs)
+
+
+class MaskedLSTM(keras.layers.CuDNNLSTM):
+
+    def __init__(self, **kwargs):
+        super(MaskedLSTM, self).__init__(**kwargs)
+        self.supports_masking = True
+
+    def compute_mask(self, inputs, mask=None):
+        return mask
+
+    def call(self, inputs, mask=None, training=None, initial_state=None):
+        if mask is not None:
+            mask = K.cast(mask, K.floatx())
+            inputs *= K.expand_dims(mask, axis=-1)
+        return super(MaskedLSTM, self).call(inputs)

@@ -3,7 +3,7 @@ import numpy as np
 import json
 import csv
 import codecs
-
+from keras.preprocessing.sequence import pad_sequences
 def readFile(file_name):
     head_id_col_vector = ['token_id', 'token', "BIO", "relation", 'head']
     file = pd.read_csv(file_name, names=head_id_col_vector, encoding="utf-8",
@@ -86,6 +86,7 @@ def collect_BIO2id(datasets,save_file):
 #         json.dump([id2BIO, BIO2id], f, indent=4, ensure_ascii=False)
 
 
+#这里有bug只能输出字符串，到时候重写一下
 class read_properties:
     def __init__(self,filepath, sep='=', comment_char='#'):
         """Read the file passed as parameter as a properties file."""
@@ -103,7 +104,8 @@ class read_properties:
     def getProperty(self,propertyName):
         return self.props.get(propertyName)
 
-def sentence_pad(datas):
+
+def sentence_pad(X,maxlen_sentence):
     #sentence_level pad for word input and bio tagging
     #use the maxlen of batch datas to pad the sentence level inputs
     """
@@ -111,18 +113,38 @@ def sentence_pad(datas):
     :param datas: [batch_size,None]
     :return: datas : [batch_size,maxlen of sentence]
     """
+    # L = [len(x) for x in X]
+    # ML = max(L)
+    ML = maxlen_sentence
+    return  [x + [0] * (ML - len(x)) for x in X]
 
-    return datas
-def char_pad(datas):
+#这里有BUG,bug在，只补全了， 没有截取
+def char_pad(datas,maxlen_sentence,maxlen_word):
     #word_leve pad for char input
     #use the maxlen of batch data of words to pad the char levels and use the maxlen of batch datas to pad the sentence level inputs
     """
-
     :param datas: [batch_size,None,None]
     :return: [batch_size,maxlen of sentence , maxlen of words]
     """
+    new_data = []
+    for sentence in datas:
+        _sentence = []
+        #字没问题
+        for word in sentence:
+            if len(word) < maxlen_word:
+                word+=[0]*(maxlen_word - len(word))
+            else:
+                word = word[:maxlen_word]
+            _sentence.append(word)
 
-    return datas
+        pad_word = [0]*maxlen_word
+        if len(_sentence) < maxlen_sentence:
+            for i in range(maxlen_sentence - len(_sentence)):
+                _sentence.append(pad_word)
+        else:
+            _sentence = _sentence[:maxlen_sentence]
+        new_data.append(_sentence)
+    return new_data
 
 #TODO complete the function for joint extraction
 def load_data(mode):
@@ -138,41 +160,43 @@ def load_data(mode):
     id2BIO, BIO2id = json.load(open(filename_BIO2id, encoding='utf-8'))
     filename_dev_me = config_file.getProperty("filename_dev_me")
     filename_test_me = config_file.getProperty("filename_test_me")
+    # maxlen_sentence = config_file.getProperty('maxlen_sentence')
+    # maxlen_word = config_file.getProperty('maxlen_word')
     eval_data=  []
 
     if mode == 'dev':
         eval_data = json.load(open(filename_dev_me, encoding='utf-8'))
     if mode == 'test':
         eval_data = json.load(open(filename_test_me, encoding='utf-8'))
-
+    TEXT_WORD, TEXT_CHAR, BIO = [], [], []
     for data in eval_data:
-        TEXT_WORD, TEXT_CHAR, BIO = [], [], []
         text = data['text']
         bio = data['BIOS']
         _text_word = [word2id.get(word) for word in text]
         _text_char = []  # 2 dimmensions
         for word in _text_word:
-            chars = [char2id.get(_char) for _char in word]
+            chars = [char2id.get(_char) for _char in str(word)]
             _text_char.append(chars)
         _bio = [BIO2id.get(b) for b in bio]
         TEXT_WORD.append(_text_word)
         TEXT_CHAR.append(_text_char)  # [batch,word,char] #padding two times,
         # first in word dimensions for sentence maxlen ,then ,in char dimensions for maxlen_word
         BIO.append(_bio)
-        TEXT_WORD = np.array(sentence_pad(TEXT_WORD))
-        TEXT_CHAR = np.array(char_pad(TEXT_CHAR))
-        BIO = np.array(sentence_pad(BIO))
-
-        return TEXT_WORD,TEXT_CHAR,BIO
+    TEXT_WORD = pad_sequences(TEXT_WORD, maxlen=100, padding='post', value=0)
+    TEXT_CHAR = np.array(char_pad(TEXT_CHAR,100,30))
+    # BIO = pad_sequences(BIO, maxlen=30, padding='post', value=0)
+    return TEXT_WORD,TEXT_CHAR,BIO
 
 #TODO
 class data_generator():
-    def __init__(self,data,char2id,word2id,BIO2id,batch_size=128):
+    def __init__(self,data,char2id,word2id,BIO2id,maxlen_sentence,maxlen_word,batch_size=128):
         self.data = data
         self.batch_size = batch_size
         self.char2id = char2id
         self.word2id = word2id
         self.BIO2id = BIO2id
+        self.maxlen_sentence = maxlen_sentence
+        self.maxlen_word = maxlen_word
         self.steps = len(self.data)//self.batch_size
         if len(self.data) % self.batch_size != 0:
             self.steps += 1
@@ -190,7 +214,7 @@ class data_generator():
                 _text_word = [self.word2id.get(word) for word in text]
                 _text_char = [] # 2 dimmensions
                 for word in _text_word:
-                    chars = [self.char2id.get(_char) for _char in word]
+                    chars = [self.char2id.get(_char) for _char in str(word)]
                     _text_char.append(chars)
                 _bio = [self.BIO2id.get(b) for b in bio]
                 TEXT_WORD.append(_text_word)
@@ -198,8 +222,8 @@ class data_generator():
                 # first in word dimensions for sentence maxlen ,then ,in char dimensions for maxlen_word
                 BIO.append(_bio)
                 if len(TEXT_WORD) == self.batch_size or idx == index[-1]:
-                    TEXT_WORD = np.array(sentence_pad(TEXT_WORD))
-                    TEXT_CHAR = np.array(char_pad(TEXT_CHAR))
-                    BIO = np.array(sentence_pad(BIO))
+                    TEXT_WORD = pad_sequences(TEXT_WORD,maxlen=self.maxlen_sentence,padding='post',value=0)
+                    TEXT_CHAR = np.array(char_pad(TEXT_CHAR,self.maxlen_sentence,self.maxlen_word))
+                    BIO = pad_sequences(BIO,maxlen=self.maxlen_sentence,padding='post',value=0)
                     yield [TEXT_WORD,TEXT_CHAR,BIO ],None
                     TEXT_WORD,TEXT_CHAR,BIO =[],[],[]
