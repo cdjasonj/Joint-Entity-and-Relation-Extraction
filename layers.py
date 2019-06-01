@@ -52,8 +52,8 @@ class Gate_Add_Lyaer(keras.layers.Layer):
         assert input_shape[0][2] == input_shape[1][2]
 
         self.W1 = self.add_weight(name='W1',shape=(input_shape[0][-1],input_shape[0][-1]),initializer='glorot_normal') #[dim,dim]
-        self.W2 = self.add_weight(name='W2',shape=(input_shape[0][-1],input_shape[0][-1]),initializers='glorot_normal')
-        self.W3 = self.add_weight(name='W3',shape=(input_shape[0][-1],input_shape[0][-1]),initializers='glorot_normal')
+        self.W2 = self.add_weight(name='W2',shape=(input_shape[0][-1],input_shape[0][-1]),initializer='glorot_normal')
+        self.W3 = self.add_weight(name='W3',shape=(input_shape[0][-1],input_shape[0][-1]),initializer='glorot_normal')
 
         super(Gate_Add_Lyaer, self).build(input_shape)
 
@@ -61,12 +61,16 @@ class Gate_Add_Lyaer(keras.layers.Layer):
         # inputs[0]:word_embedding ,inputs[1]:char_embedding
         word_embedding_shape = K.int_shape(inputs[0]) #[batch,sentence,dim of word embedding]
         char_embedding_shape = K.int_shape(inputs[1]) #[batch,sentence,dim of char embedding]
-        word_embedding_reshaped = K.reshape(inputs[0],shape=(-1,word_embedding_shape[-1])) #[batch*sentence,dim of word embedding]
-        char_embedding_reshaped = K.reshape(inputs[1],shape=(-1,char_embedding_shape[-1])) #[batch*sentence, dim of char embedding]
-        z = K.sigmoid(K.dot(K.tanh(K.dot(word_embedding_reshaped,self.W1) + K.dot(char_embedding_shape,self.W2)),self.W3))
-        embedding = z*word_embedding_reshaped + (1-z)*char_embedding_reshaped  #[batch*sentence,]
-        embedding = K.reshape(embedding,shape=(-1,word_embedding_reshaped[1],word_embedding_reshaped[-1]))# [batch,sentecen,dim]
-
+        # word_embedding_reshaped = K.reshape(inputs[0],shape=(-1,word_embedding_shape[-1])) #[batch*sentence,dim of word embedding]
+        # char_embedding_reshaped = K.reshape(inputs[1],shape=(-1,char_embedding_shape[-1])) #[batch*sentence, dim of char embedding]
+        word_embedding = K.dot(inputs[0],self.W1)
+        char_embedding = K.dot(inputs[1],self.W2)
+        wc_tanh = K.tanh(word_embedding+char_embedding)
+        z = K.sigmoid(K.dot(wc_tanh,self.W3))
+        embedding = z*inputs[0]+(1-z)*inputs[1]
+        # z = K.sigmoid(K.dot(K.tanh(K.dot(word_embedding_reshaped,self.W1) + K.dot(char_embedding_shape,self.W2)),self.W3))
+        # embedding = z*word_embedding_reshaped + (1-z)*char_embedding_reshaped  #[batch*sentence,]
+        # embedding = K.reshape(embedding,shape=(-1,word_embedding_reshaped[1],word_embedding_reshaped[-1]))# [batch,sentecen,dim]
         return embedding
 
     def compute_output_shape(self, input_shape):

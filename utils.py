@@ -60,7 +60,6 @@ def collect_word2id(datasets,save_file):
     with codecs.open(save_file, 'w', encoding='utf-8') as f:
         json.dump([id2word, word2id], f, indent=4, ensure_ascii=False)
 
-
 def collect_BIO2id(datasets,save_file):
     BIOs = {}
     for data in datasets:
@@ -73,7 +72,6 @@ def collect_BIO2id(datasets,save_file):
     BIO2id = {j:i for i,j in id2BIO.items()}
     with codecs.open(save_file, 'w', encoding='utf-8') as f:
         json.dump([id2BIO, BIO2id], f, indent=4, ensure_ascii=False)
-
 
 # def collect_relations2id(datasets,save_file):
 #     BIOs = {}
@@ -158,32 +156,37 @@ def load_data(mode):
     id2char, char2id = json.load(open(filename_char2id, encoding='utf-8'))
     id2word, word2id = json.load(open(filename_word2id, encoding='utf-8'))
     id2BIO, BIO2id = json.load(open(filename_BIO2id, encoding='utf-8'))
+    filename_train_me = config_file.getProperty("filename_train_me")
     filename_dev_me = config_file.getProperty("filename_dev_me")
     filename_test_me = config_file.getProperty("filename_test_me")
-    # maxlen_sentence = config_file.getProperty('maxlen_sentence')
-    # maxlen_word = config_file.getProperty('maxlen_word')
+    maxlen_sentence = int(config_file.getProperty('maxlen_sentence'))
+    maxlen_word = int(config_file.getProperty('maxlen_word'))
     eval_data=  []
-
+    # import ipdb
+    # ipdb.set_trace()
     if mode == 'dev':
         eval_data = json.load(open(filename_dev_me, encoding='utf-8'))
     if mode == 'test':
         eval_data = json.load(open(filename_test_me, encoding='utf-8'))
+    if mode == 'train':
+        eval_data = json.load(open(filename_train_me,encoding='utf-8'))
+
     TEXT_WORD, TEXT_CHAR, BIO = [], [], []
     for data in eval_data:
         text = data['text']
         bio = data['BIOS']
-        _text_word = [word2id.get(word) for word in text]
+        _text_word = [word2id.get(word,0) for word in text]
         _text_char = []  # 2 dimmensions
         for word in _text_word:
-            chars = [char2id.get(_char) for _char in str(word)]
+            chars = [char2id.get(_char,0) for _char in str(word)]
             _text_char.append(chars)
         _bio = [BIO2id.get(b) for b in bio]
         TEXT_WORD.append(_text_word)
         TEXT_CHAR.append(_text_char)  # [batch,word,char] #padding two times,
         # first in word dimensions for sentence maxlen ,then ,in char dimensions for maxlen_word
         BIO.append(_bio)
-    TEXT_WORD = pad_sequences(TEXT_WORD, maxlen=100, padding='post', value=0)
-    TEXT_CHAR = np.array(char_pad(TEXT_CHAR,100,30))
+    TEXT_WORD = pad_sequences(TEXT_WORD, maxlen=maxlen_sentence, padding='post', value=0)
+    TEXT_CHAR = np.array(char_pad(TEXT_CHAR,maxlen_sentence,maxlen_word))
     # BIO = pad_sequences(BIO, maxlen=30, padding='post', value=0)
     return TEXT_WORD,TEXT_CHAR,BIO
 
@@ -227,3 +230,36 @@ class data_generator():
                     BIO = pad_sequences(BIO,maxlen=self.maxlen_sentence,padding='post',value=0)
                     yield [TEXT_WORD,TEXT_CHAR,BIO ],None
                     TEXT_WORD,TEXT_CHAR,BIO =[],[],[]
+
+def _load_embed(file):
+    def get_coefs(word, *arr):
+        return word, np.asarray(arr)[:100]
+    embeddings_index = dict(get_coefs(*o.split(" ")) for o in open(file, encoding='utf-8'))
+
+    return embeddings_index
+
+def _load_embedding_matrix(word_index, embedding):
+    embed_word_count = 0
+    # nb_words = min(max_features, len(word_index))
+    nb_words = len(word_index)
+    embedding_matrix = np.random.normal(size=(nb_words+1, 100))
+
+    for word, i in word_index.items():
+#        if i >= max_features: continue
+        if word not in embedding:
+            word = word.lower()
+        if word.islower and word not in embedding:
+            word = word.title()
+        embedding_vector = embedding.get(word)
+        if embedding_vector is not None:
+            embedding_matrix[i] = embedding_vector
+            embed_word_count += 1
+    print('词向量的覆盖率为{}'.format(embed_word_count / len(word_index)))
+    return embedding_matrix
+
+def get_embedding_matrix(word_index):
+    embedding_dir = 'data/CoNLL04/glove.6B.100d.txt'
+    embedding = _load_embed(embedding_dir)
+    embedding_matrix = _load_embedding_matrix(word_index, embedding)
+
+    return embedding_matrix

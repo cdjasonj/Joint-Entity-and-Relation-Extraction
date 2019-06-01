@@ -6,6 +6,7 @@ def NER_result_Evaluator(outputs,targets):
     这里测评下ner的结果的f1
     :return:
     """
+
     right,true,pred = 1e-10, 1e-10, 1e-10
 
     for i in range(len(outputs)):
