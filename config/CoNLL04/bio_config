@@ -9,10 +9,12 @@ filename_test_me = "data/CoNLL04/test_me.json"
 
 filename_char2id = "data/CoNLL04/char2id.json"
 filename_word2id = "data/CoNLL04/word2id.json"
+filename_n_char2id = "data/CoNLL04/n_char2id.json"
 filename_BIO2id = "data/CoNLL04/BIO2id.json"
 filename_relation2id = "data/CoNLL04/relation2id.json"
 
 #training
+is_use_n_char=False
 epochs = 150
 batch_size = 128
 optimizer = Adam
@@ -21,10 +23,13 @@ save_model_file = "save_model/ner_model.weights"
 #hyperparameters
 hidden_size = 128
 nb_head = 8
-word_embed_size = 300
-char_embed_size = 300
+word_embed_size = 100
+char_embed_size = 30
+maxlen_sentence = 100
+maxlen_word = 25
 multi_layers = 4
-embedding_dropout_prob = 0.1
-nn_dropout_prob = 0.1
-learning_rate = 2e-4
+embedding_dropout_prob = 0.25
+nn_dropout_prob = 0.25
+learning_rate = 1e-3
 is_use_char_embedding = True
+

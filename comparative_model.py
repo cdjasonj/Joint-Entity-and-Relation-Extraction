@@ -51,11 +51,12 @@ class lstm_attention_model_ner_part():
         word_input = Input(shape=(self.maxlen_sentence,)) #[batch,sentencen]
         char_input = Input(shape=(self.maxlen_sentence,self.maxlen_word,)) #[batch,word,char]
         ner_label = Input(shape=(self.maxlen_sentence,))
+        # relation_label = Input(shape=(self.maxlen_sentence,))
 
         mask = Lambda(lambda x: K.cast(K.greater(K.expand_dims(x, 2), 0), 'float32'))(word_input)
 
-        word_embedding = Embedding(self.word_vocab_size, self.word_embed_size,weights=[self.embedding_martrix],name='word_embedding',trainable=True)(word_input) #[batch,word,embed]
-        char_embedding = Embedding(self.char_vocab_size,self.char_embed_size,name='char_embedding',trainable=True)(char_input) #[batch,word,char,embedd]
+        word_embedding = Embedding(self.word_vocab_size, self.word_embed_size,mask_zero=True,weights=[self.embedding_martrix],name='word_embedding',trainable=True)(word_input) #[batch,word,embed]
+        char_embedding = Embedding(self.char_vocab_size,self.char_embed_size,mask_zero=True,name='char_embedding',trainable=True)(char_input) #[batch,word,char,embedd]
 
         if self.embedding_dropout_prob:
             word_embedding = Dropout(self.embedding_dropout_prob)(word_embedding)
@@ -68,7 +69,6 @@ class lstm_attention_model_ner_part():
             char_embedding_reshaped = self.reshape_layer_1(char_embedding,char_embedding_shape)
             char_lstm = Bidirectional(MaskedLSTM(units=self.char_embed_size // 2, return_sequences=True, name='char_lstm_layer'))(
                 char_embedding_reshaped)
-
             attention = TimeDistributed(Dense(1, activation='tanh'))(char_lstm)
             attention = MaskFlatten()(attention)
             attention = Activation('softmax')(attention)
@@ -94,38 +94,32 @@ class lstm_attention_model_ner_part():
         if self.embedding_dropout_prob:
             embedding = Dropout(self.embedding_dropout_prob)(embedding)
 
-        # part1 , multi-self-attentionblock, (CNN/LSTM/FNN+self-attention)
-        lstm = Bidirectional(MaskedLSTM(units=self.hidden_size // 2, return_sequences=True), name='lstm_layer0')(embedding)
-        if self.nn_dropout_prob:
-            lstm = Dropout(self.nn_dropout_prob)(lstm)
-        # # multi_lstm_layers
-        # if self.multi_layers >= 2:
-        #     for i in range(self.multi_layers - 1):
-        #         i+=1
-        #         lstm = Bidirectional(CuDNNLSTM(self.hidden_size // 2, return_sequences=True), name='lstm_layer{}'.format(i))(lstm)
-        #         if self.nn_dropout_prob:
-        #             lstm = Dropout(self.nn_dropout_prob)(lstm)
 
+        # part1 , multi-self-attentionblock, (CNN/LSTM/FNN+self-attention)
+        lstm = Bidirectional(MaskedLSTM(units=self.hidden_size // 2, return_sequences=True))(embedding)
         attention = TimeDistributed(Dense(1, activation='tanh'))(lstm)
-        #
         attention = MaskFlatten()(attention)
         attention = Activation('softmax')(attention)
         attention = MaskRepeatVector(self.hidden_size)(attention)
         attention = MaskPermute([2, 1])(attention)
         sent_representation = multiply([lstm, attention])
         attention = Lambda(lambda xin: K.sum(xin, axis=1))(sent_representation)
-        lstm_attention = Lambda(seq_and_vec, output_shape=(None, self.hidden_size * 2))(
-            [lstm, attention])  # [这里考虑下用相加的方法，以及门控相加]
-        lstm_attention = MaskedConv1D(filters=self.hidden_size,kernel_size=3,activation='relu',padding='same')(lstm_attention)
+        # lstm_attention = Lambda(seq_and_vec, output_shape=(None, self.hidden_size * 2))(
+        #     [lstm, attention])  # [这里考虑下用相加的方法，以及门控相加]
+        attention = MaskRepeatVector(self.maxlen_sentence)(attention) #[batch,sentence,hidden_size]
+        lstm = Gate_Add_Lyaer()([lstm,attention])
+        if self.nn_dropout_prob:
+            lstm = Dropout(self.nn_dropout_prob)(lstm)
 
+        lstm_attention = MaskedConv1D(filters=self.hidden_size,kernel_size=3,activation='relu',padding='same')(lstm)
         bio_pred = Dense(self.num_classes, activation='softmax')(lstm_attention)
         pred_model =Model([word_input, char_input], bio_pred)
+        #part2 multi-head selection for relation classification
         train_model = Model([word_input, char_input, ner_label], bio_pred)
 
         loss = K.sparse_categorical_crossentropy(ner_label, bio_pred)
         loss = K.sum(loss * mask[:, :, 0]) / K.sum(mask)
 
-        loss = K.sum(loss * mask) / K.sum(mask)
         train_model.summary()
         train_model.add_loss(loss)
         train_model.compile(keras.optimizers.adam(lr=self.learning_rate))
@@ -176,11 +170,11 @@ class lstm_model_ner_part():
         word_input = Input(shape=(self.maxlen_sentence,)) #[batch,sentencen]
         char_input = Input(shape=(self.maxlen_sentence,self.maxlen_word,)) #[batch,word,char]
         ner_label = Input(shape=(self.maxlen_sentence,))
-
+        # relation_label = Input(shape=self.maxlen_sentence,) #[batch,sentence,n_classes]
         mask = Lambda(lambda x: K.cast(K.greater(K.expand_dims(x, 2), 0), 'float32'))(word_input)
 
-        word_embedding = Embedding(self.word_vocab_size, self.word_embed_size,weights=[self.embedding_martrix],name='word_embedding',trainable=True)(word_input) #[batch,word,embed]
-        char_embedding = Embedding(self.char_vocab_size,self.char_embed_size,name='char_embedding',trainable=True)(char_input) #[batch,word,char,embedd]
+        word_embedding = Embedding(self.word_vocab_size, self.word_embed_size,mask_zero=True,weights=[self.embedding_martrix],name='word_embedding',trainable=True)(word_input) #[batch,word,embed]
+        char_embedding = Embedding(self.char_vocab_size,self.char_embed_size,mask_zero=True,name='char_embedding',trainable=True)(char_input) #[batch,word,char,embedd]
 
         if self.embedding_dropout_prob:
             word_embedding = Dropout(self.embedding_dropout_prob)(word_embedding)
@@ -227,6 +221,8 @@ class lstm_model_ner_part():
         #             lstm = Dropout(self.nn_dropout_prob)(lstm)
         bio_pred = Dense(self.num_classes, activation='softmax')(lstm)
         pred_model =Model([word_input, char_input], bio_pred)
+
+
         train_model = Model([word_input, char_input, ner_label], bio_pred)
 
         loss = K.sparse_categorical_crossentropy(ner_label, bio_pred)

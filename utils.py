@@ -50,6 +50,18 @@ def collect_char2id(datasets,save_file):
     with codecs.open(save_file, 'w', encoding='utf-8') as f:
         json.dump([id2char, char2id], f, indent=4, ensure_ascii=False)
 
+def collect_n_char2id(datasets,save_file,n):
+    chars = {}
+    for data in datasets:
+        for word in data['text']:
+            n_chars = n_char(word,n)
+            for _n_char in n_chars:
+                chars[_n_char] = chars.get(_n_char, 0) + 1
+    id2char = {i+1:j for i,j in enumerate(chars)} # padding: 0
+    char2id = {j:i for i,j in id2char.items()}
+    with codecs.open(save_file, 'w', encoding='utf-8') as f:
+        json.dump([id2char, char2id], f, indent=4, ensure_ascii=False)
+
 def collect_word2id(datasets,save_file):
     words = {}
     for data in datasets:
@@ -116,7 +128,35 @@ def sentence_pad(X,maxlen_sentence):
     ML = maxlen_sentence
     return  [x + [0] * (ML - len(x)) for x in X]
 
-#这里有BUG,bug在，只补全了， 没有截取
+
+def n_char(word,n):
+    """
+    split the word use n_gram
+    n = 2
+    word = love
+    ==>  lo ov ve e<pad>
+    n =3
+    word = love
+    ==> lov ove ve<pad>
+    :param word:
+    :return:
+    """
+    word = str(word)
+    n_char = []
+    n_char.append('<pad>'*(n-1) + word[0])
+    temp = ''
+    for index,char in enumerate(word):
+        if index+n < len(word):
+            temp += word[index:index+n]
+            n_char.append(temp)
+            temp = ''
+        else:
+            temp += word[index:]
+            temp += '<pad>' * (n - len(temp))
+            n_char.append(temp)
+            temp = ''
+    return n_char
+
 def char_pad(datas,maxlen_sentence,maxlen_word):
     #word_leve pad for char input
     #use the maxlen of batch data of words to pad the char levels and use the maxlen of batch datas to pad the sentence level inputs
@@ -127,7 +167,6 @@ def char_pad(datas,maxlen_sentence,maxlen_word):
     new_data = []
     for sentence in datas:
         _sentence = []
-        #字没问题
         for word in sentence:
             if len(word) < maxlen_word:
                 word+=[0]*(maxlen_word - len(word))
@@ -149,11 +188,13 @@ def load_data(mode):
     #only for ner prediction now , then i will compelet the function for joint extraction
     #load data for predict
     config_file = read_properties('config/CoNLL04/bio_config')
+    is_use_n_char = bool(config_file.getProperty('is_use_n_char'))
     filename_char2id = config_file.getProperty("filename_char2id")
     filename_word2id = config_file.getProperty("filename_word2id")
     filename_BIO2id = config_file.getProperty("filename_BIO2id")
     filename_relation2id = config_file.getProperty("filename_relation2id")
     id2char, char2id = json.load(open(filename_char2id, encoding='utf-8'))
+    id2n_char, n_char2id = json.load(open(filename_char2id, encoding='utf-8'))
     id2word, word2id = json.load(open(filename_word2id, encoding='utf-8'))
     id2BIO, BIO2id = json.load(open(filename_BIO2id, encoding='utf-8'))
     filename_train_me = config_file.getProperty("filename_train_me")
@@ -177,9 +218,15 @@ def load_data(mode):
         bio = data['BIOS']
         _text_word = [word2id.get(word,0) for word in text]
         _text_char = []  # 2 dimmensions
-        for word in _text_word:
-            chars = [char2id.get(_char,0) for _char in str(word)]
-            _text_char.append(chars)
+        if is_use_n_char:
+            for word in _text_word:
+                n_chars = n_char(word,3)
+                chars = [n_char2id.get(_char) for _char in n_chars]
+                _text_char.append(chars)
+        else:
+            for word in _text_word:
+                chars = [char2id.get(_char) for _char in str(word)]
+                _text_char.append(chars)
         _bio = [BIO2id.get(b) for b in bio]
         TEXT_WORD.append(_text_word)
         TEXT_CHAR.append(_text_char)  # [batch,word,char] #padding two times,
@@ -192,14 +239,16 @@ def load_data(mode):
 
 #TODO
 class data_generator():
-    def __init__(self,data,char2id,word2id,BIO2id,maxlen_sentence,maxlen_word,batch_size=128):
+    def __init__(self,data,char2id,n_char2id,word2id,BIO2id,maxlen_sentence,maxlen_word,is_use_n_char,batch_size=128):
         self.data = data
         self.batch_size = batch_size
         self.char2id = char2id
+        self.n_char2id = n_char2id
         self.word2id = word2id
         self.BIO2id = BIO2id
         self.maxlen_sentence = maxlen_sentence
         self.maxlen_word = maxlen_word
+        self.is_use_n_char = is_use_n_char
         self.steps = len(self.data)//self.batch_size
         if len(self.data) % self.batch_size != 0:
             self.steps += 1
@@ -216,9 +265,15 @@ class data_generator():
                 bio = _data['BIOS']
                 _text_word = [self.word2id.get(word) for word in text]
                 _text_char = [] # 2 dimmensions
-                for word in _text_word:
-                    chars = [self.char2id.get(_char) for _char in str(word)]
-                    _text_char.append(chars)
+                if self.is_use_n_char:
+                    for word in _text_word:
+                        n_chars = n_char(word,3)
+                        chars = [self.n_char2id.get(_char) for _char in n_chars]
+                        _text_char.append(chars)
+                else:
+                    for word in _text_word:
+                        chars = [self.char2id.get(_char) for _char in str(word)]
+                        _text_char.append(chars)
                 _bio = [self.BIO2id.get(b) for b in bio]
                 TEXT_WORD.append(_text_word)
                 TEXT_CHAR.append(_text_char) #[batch,word,char] #padding two times,

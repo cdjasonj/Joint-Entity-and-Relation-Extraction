@@ -13,6 +13,13 @@ def seq_and_vec(x):
     vec = K.zeros_like(seq[:, :, :1]) + vec
     return K.concatenate([seq, vec], 2)
 
+def attention_like_tensor(x):
+    """
+    把attention向量广播到每个一时间步，
+    :param x: [batch,dim]
+    :return:  [batch,sentene,dim]
+    """
+
 class Attention_Layer(keras.layers.Layer):
 
     """
@@ -47,6 +54,7 @@ class Gate_Add_Lyaer(keras.layers.Layer):
         :param kwargs:
         """
         super(Gate_Add_Lyaer,self).__init__(**kwargs)
+        self.supports_masking = True
 
     def build(self, input_shape):
         assert input_shape[0][2] == input_shape[1][2]
@@ -72,6 +80,10 @@ class Gate_Add_Lyaer(keras.layers.Layer):
         # embedding = z*word_embedding_reshaped + (1-z)*char_embedding_reshaped  #[batch*sentence,]
         # embedding = K.reshape(embedding,shape=(-1,word_embedding_reshaped[1],word_embedding_reshaped[-1]))# [batch,sentecen,dim]
         return embedding
+
+    def compute_mask(self, inputs, mask=None):
+        return mask
+
 
     def compute_output_shape(self, input_shape):
         return (input_shape[0][0],input_shape[0][1],input_shape[0][2])

@@ -23,6 +23,7 @@ filename_relation2id = config_file.getProperty("filename_relation2id")
 epochs = config_file.getProperty("epochs")
 batch_size = config_file.getProperty('batch_size')
 model_save_file = config_file.getProperty('save_model_file')
+is_use_n_char = bool(config_file.getProperty('is_use_n_char'))
 
 #hyperparameters
 is_use_char_embedding = bool(config_file.getProperty('is_use_char_embedding'))
@@ -40,6 +41,7 @@ maxlen_word = int(config_file.getProperty('maxlen_word'))
 train_data = json.load(open(filename_train_me,encoding='utf-8'))
 dev_data = json.load(open(filename_dev_me,encoding='utf-8'))
 id2char, char2id = json.load(open(filename_char2id,encoding='utf-8'))
+id2n_char, n_char2id = json.load(open(filename_char2id,encoding='utf-8'))
 id2word, word2id = json.load(open(filename_word2id,encoding='utf-8'))
 id2BIO,BIO2id = json.load(open(filename_BIO2id,encoding='utf-8'))
 # id2relation,relation2id = json.load(open(filename_relation2id,encoding='utf-8'))
@@ -57,10 +59,10 @@ embedding_martrix = get_embedding_matrix(word2id)
 #                                                ner_classes_num, maxlen_sentence,maxlen_word,learning_rate, embedding_dropout_prob, nn_dropout_prob, 'adam',False)
 
 word_char_embed_mode = 'concate'
-lstm_model = lstm_model_ner_part(embedding_martrix,hidden_size, nb_head, word_embed_size, char_embed_size, word_vocab_size, char_vocab_size, multi_layers,
-                                ner_classes_num, maxlen_sentence,maxlen_word,word_char_embed_mode,learning_rate,embedding_dropout_prob,nn_dropout_prob,'adam',True)
-# lstm_model = lstm_attention_model_ner_part(embedding_martrix,hidden_size, nb_head, word_embed_size, char_embed_size, word_vocab_size, char_vocab_size, multi_layers,
+# lstm_model = lstm_model_ner_part(embedding_martrix,hidden_size, nb_head, word_embed_size, char_embed_size, word_vocab_size, char_vocab_size, multi_layers,
 #                                 ner_classes_num, maxlen_sentence,maxlen_word,word_char_embed_mode,learning_rate,embedding_dropout_prob,nn_dropout_prob,'adam',True)
+lstm_model = lstm_attention_model_ner_part(embedding_martrix,hidden_size, nb_head, word_embed_size, char_embed_size, word_vocab_size, char_vocab_size, multi_layers,
+                                ner_classes_num, maxlen_sentence,maxlen_word,word_char_embed_mode,learning_rate,embedding_dropout_prob,nn_dropout_prob,'adam',True)
 
 train_model,pred_model = lstm_model.model()
 
@@ -87,7 +89,7 @@ def pred_op(mode):
 
 def train_op():
     # reduce_lr = LearningRateScheduler(scheduler, verbose=1)
-    train_D = data_generator(train_data,char2id,word2id,BIO2id,maxlen_sentence,maxlen_word,128)
+    train_D = data_generator(train_data,char2id,n_char2id,word2id,BIO2id,maxlen_sentence,maxlen_word,is_use_n_char,128)
     best_f1 = 0
     for i in range(1,150): #epochs
         print(i)
@@ -96,17 +98,17 @@ def train_op():
                                   epochs=1,
                                   # callbacks=[reduce_lr]
                                   )
-        if (i) % 2 == 0 : #两次对dev进行一次测评,并对dev结果进行保存
-            ner_pred,true_bio = pred_op('dev')
-            P, R, F = NER_result_Evaluator(ner_pred,true_bio)
-            if F > best_f1 :
-                train_model.save_weights(model_save_file)
-                best_f1 = F
-                print('当前第{}个epoch，验证集,准确度为{},召回为{},f1为：{}'.format(i,P,R,F))
+        # if (i) % 2 == 0 : #两次对dev进行一次测评,并对dev结果进行保存
+        ner_pred,true_bio = pred_op('dev')
+        P, R, F = NER_result_Evaluator(ner_pred,true_bio)
+        if F > best_f1 :
+            train_model.save_weights(model_save_file)
+            best_f1 = F
+            print('当前第{}个epoch，验证集,准确度为{},召回为{},f1为：{}'.format(i,P,R,F))
 
-                ner_pred, true_bio = pred_op('test')
-                P, R, F = NER_result_Evaluator(ner_pred, true_bio)
-                print('当前第{}个epoch，测试集,准确度为{},召回为{},f1为：{}'.format(i,P,R,F))
+            ner_pred, true_bio = pred_op('test')
+            P, R, F = NER_result_Evaluator(ner_pred, true_bio)
+            print('当前第{}个epoch，测试集,准确度为{},召回为{},f1为：{}'.format(i,P,R,F))
 
         if i % 50 == 0:
             ner_pred, true_bio = pred_op('train')
